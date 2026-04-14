@@ -21,21 +21,10 @@ jobs:
       run: |
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o hello-app main.go
 
-    # 🔍 【新增】SSH 连接调试步骤
-    - name: Test SSH Connection
-      uses: appleboy/ssh-action@v0.1.5
-      with:
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: ${{ secrets.REMOTE_PORT }}
-        # 极简脚本，仅测试连通性和权限
-        script: |
-          echo "✅ SSH连接成功！"
-          echo "当前用户: $(whoami)"
-          echo "当前目录: $(pwd)"
+    # ✅ 已确认连接成功，这里可以删掉或注释掉 "Test SSH Connection" 步骤以保持整洁
+    # - name: Test SSH Connection
+    #   ...
 
-    # 后续原有的 SCP 和部署步骤保持不变
     - name: Copy binary to server
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -45,7 +34,7 @@ jobs:
         source: "hello-app"
         target: ${{ secrets.REMOTE_TARGET }}
 
-    - name: Deploy application
+    - name: Deploy and Run application
       uses: appleboy/ssh-action@v0.1.5
       with:
         host: ${{ secrets.REMOTE_HOST }}
@@ -53,5 +42,17 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           cd ${{ secrets.REMOTE_TARGET }}
+          
+          # 1. 给二进制文件加执行权限
           chmod +x hello-app
-          # 重启逻辑...
+          
+          # 2. 🚨【新增】停止旧进程（如果有）
+          pkill -f hello-app || true  # "|| true" 防止找不到进程时报错停止脚本
+          
+          # 3. 🚨【新增】运行程序并记录日志
+          # 因为你的程序是打印完就结束，这里直接运行并输出到日志
+          ./hello-app > app.log 2>&1
+          
+          # 4. 🚨【新增】检查运行结果
+          echo "📝 查看程序是否执行成功："
+          cat app.log
